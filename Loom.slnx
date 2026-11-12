@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Loom.Core/Loom.Core.csproj" />
+    <Project Path="src/Loom.Schema/Loom.Schema.csproj" />
+    <Project Path="src/Loom.Evaluator/Loom.Evaluator.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Loom.Tests/Loom.Tests.csproj" />
+  </Folder>
+</Solution>
