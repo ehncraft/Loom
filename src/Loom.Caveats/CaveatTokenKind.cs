@@ -1,0 +1,33 @@
+namespace Loom.Caveats;
+
+internal enum CaveatTokenKind
+{
+    Identifier,
+    IntLiteral,
+    StringLiteral,
+    KeywordCaveat,
+    KeywordList,
+    KeywordString,
+    KeywordInt,
+    KeywordBool,
+    KeywordTrue,
+    KeywordFalse,
+    KeywordIn,
+    LParen,
+    RParen,
+    LBrace,
+    RBrace,
+    LBracket,
+    RBracket,
+    Comma,
+    Less,
+    Greater,
+    EqualEqual,
+    NotEqual,
+    LessOrEqual,
+    GreaterOrEqual,
+    AndAnd,
+    OrOr,
+    Not,
+    Eof,
+}

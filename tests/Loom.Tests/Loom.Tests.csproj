@@ -22,6 +22,8 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Loom.Core\Loom.Core.csproj" />
     <ProjectReference Include="..\..\src\Loom.Schema\Loom.Schema.csproj" />
+    <ProjectReference Include="..\..\src\Loom.Relationships\Loom.Relationships.csproj" />
+    <ProjectReference Include="..\..\src\Loom.Caveats\Loom.Caveats.csproj" />
     <ProjectReference Include="..\..\src\Loom.Evaluator\Loom.Evaluator.csproj" />
   </ItemGroup>
 

@@ -18,6 +18,8 @@
   <ItemGroup>
     <ProjectReference Include="..\Loom.Core\Loom.Core.csproj" />
     <ProjectReference Include="..\Loom.Schema\Loom.Schema.csproj" />
+    <ProjectReference Include="..\Loom.Relationships\Loom.Relationships.csproj" />
+    <ProjectReference Include="..\Loom.Caveats\Loom.Caveats.csproj" />
   </ItemGroup>
 
 </Project>

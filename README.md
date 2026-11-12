@@ -12,23 +12,28 @@ subject identity you hand it.
 
 ## Status
 
-Early, in-progress. Phase 1 (current): an in-memory `Check` evaluator proving the core
-relation-tuple graph algorithm — direct relations, computed-userset inheritance,
-tuple-to-userset hierarchy traversal, nested usersets, and cycle safety. No caveats, no
-SQL-backed storage, no multi-tenancy, no AuthZEN adapter yet — see `CHANGELOG.md` and the
-package table below as those land.
+Early, in-progress. Phase 1 + Phase 2 (current): an in-memory `Check`/`Expand`/
+`LookupResources`/`LookupSubjects` evaluator over a mutable relation-tuple store, with
+Netflix-style caveats (CEL-subset conditions attached to tuples) wired in as a third
+`Caveated` outcome alongside `Permit`/`Deny`. No SQL-backed storage, no multi-tenancy, no
+AuthZEN adapter yet.
 
 ## Packages
 
 | Package | Description |
 |---|---|
-| `Loom.Core` | Core value types: `ObjectRef`, `SubjectRef`, `RelationTuple`, `CheckResult` |
+| `Loom.Core` | Core value types: `ObjectRef`, `SubjectRef`, `RelationTuple`, `CheckResult`, `ExpandNode` |
 | `Loom.Schema` | SpiceDB-style schema language: lexer, parser, AST (`definition`/`relation`/`permission`) |
-| `Loom.Evaluator` | The `Check` algorithm — resolves a permission's rewrite tree against relation tuples |
+| `Loom.Relationships` | Mutable relation-tuple storage: read/write/delete, namespace enumeration |
+| `Loom.Caveats` | CEL-subset expression engine for ABAC conditions attached to relation tuples |
+| `Loom.Evaluator` | `Check`, `Expand`, `LookupResources`, `LookupSubjects` against a schema + tuple store |
 
-Planned: `Loom.Caveats` (CEL-subset expression engine for ABAC conditions), `Loom.Relationships`
-(mutable tuple-store abstraction), `Loom.Sql` (SQL Server-backed storage), `Loom.AspNetCore`,
-`Loom.AuthZen`, `Loom.Testing`.
+`LookupResources`/`LookupSubjects` are brute-force today (scan every resource/subject of the
+target namespace and `Check` each) — correct, not yet optimized; a reverse-index-based
+traversal is a later-phase concern. `Expand` is purely structural and caveat-unaware, matching
+real SpiceDB semantics (caveats only resolve at `Check` time, once runtime context is known).
+
+Planned: `Loom.Sql` (SQL Server-backed storage), `Loom.AspNetCore`, `Loom.AuthZen`, `Loom.Testing`.
 
 ## Schema example
 
@@ -48,6 +53,34 @@ definition document {
     permission view = edit + viewer
 }
 ```
+
+## Modeling org hierarchy: Department is first-class
+
+For multi-tenant deployments where every tenant has departments (the common case this engine
+targets), model `department` as its own schema definition with an explicit `tuple_to_userset`
+edge back to its tenant — not as an attribute bolted onto a membership or flattened into a
+permission-key suffix. This lets a tenant-level admin grant cascade into every department for
+free, and keeps department-scoped approval authority (a real banking/SACCO requirement) a
+first-class relationship rather than a side channel:
+
+```
+definition membership {}
+
+definition tenant {
+    relation admin: membership
+}
+
+definition department {
+    relation tenant: tenant
+    relation lead: membership
+    relation staff: membership
+
+    permission approve_requests = lead + tenant->admin
+    permission view_requests = approve_requests + staff
+}
+```
+
+See `DepartmentHierarchyTests.cs` for the worked example this schema is tested against.
 
 ## Design principles
 

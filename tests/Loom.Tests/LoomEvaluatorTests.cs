@@ -1,6 +1,7 @@
 using Loom.Core;
 using Loom.Schema;
 using Loom.Evaluator;
+using Loom.Relationships;
 
 namespace Loom.Tests;
 
@@ -19,7 +20,7 @@ public class LoomEvaluatorTests
             }
             """);
 
-        var tuples = new InMemoryRelationTupleReader([
+        var tuples = new InMemoryRelationTupleStore([
             new RelationTuple(new ObjectRef("document", "1"), "owner", new SubjectRef("user", "alice")),
         ]);
 
@@ -27,7 +28,7 @@ public class LoomEvaluatorTests
 
         var result = evaluator.Check(new ObjectRef("document", "1"), "edit", new SubjectRef("user", "alice"));
 
-        Assert.Equal(CheckResult.Permit, result);
+        Assert.IsType<CheckResult.Permit>(result);
     }
 
     [Fact]
@@ -46,7 +47,7 @@ public class LoomEvaluatorTests
             }
             """);
 
-        var tuples = new InMemoryRelationTupleReader([
+        var tuples = new InMemoryRelationTupleStore([
             new RelationTuple(new ObjectRef("document", "1"), "editor", new SubjectRef("user", "bob")),
         ]);
 
@@ -54,7 +55,7 @@ public class LoomEvaluatorTests
 
         var result = evaluator.Check(new ObjectRef("document", "1"), "view", new SubjectRef("user", "bob"));
 
-        Assert.Equal(CheckResult.Permit, result);
+        Assert.IsType<CheckResult.Permit>(result);
     }
 
     [Fact]
@@ -77,7 +78,7 @@ public class LoomEvaluatorTests
             }
             """);
 
-        var tuples = new InMemoryRelationTupleReader([
+        var tuples = new InMemoryRelationTupleStore([
             new RelationTuple(new ObjectRef("document", "1"), "parent", new SubjectRef("folder", "A")),
             new RelationTuple(new ObjectRef("folder", "A"), "viewer", new SubjectRef("user", "carol")),
         ]);
@@ -86,7 +87,7 @@ public class LoomEvaluatorTests
 
         var result = evaluator.Check(new ObjectRef("document", "1"), "view", new SubjectRef("user", "carol"));
 
-        Assert.Equal(CheckResult.Permit, result);
+        Assert.IsType<CheckResult.Permit>(result);
     }
 
     [Fact]
@@ -106,7 +107,7 @@ public class LoomEvaluatorTests
             }
             """);
 
-        var tuples = new InMemoryRelationTupleReader([
+        var tuples = new InMemoryRelationTupleStore([
             new RelationTuple(new ObjectRef("group", "eng"), "member", new SubjectRef("user", "dave")),
             new RelationTuple(new ObjectRef("document", "1"), "viewer", new SubjectRef("group", "eng", "member")),
         ]);
@@ -115,7 +116,7 @@ public class LoomEvaluatorTests
 
         var result = evaluator.Check(new ObjectRef("document", "1"), "view", new SubjectRef("user", "dave"));
 
-        Assert.Equal(CheckResult.Permit, result);
+        Assert.IsType<CheckResult.Permit>(result);
     }
 
     [Fact]
@@ -129,11 +130,11 @@ public class LoomEvaluatorTests
             }
             """);
 
-        var tuples = new InMemoryRelationTupleReader([]);
+        var tuples = new InMemoryRelationTupleStore([]);
         var evaluator = new LoomEvaluator(schema, tuples);
 
         var result = evaluator.Check(new ObjectRef("cyclic", "1"), "a", new SubjectRef("user", "anyone"));
 
-        Assert.Equal(CheckResult.Deny, result);
+        Assert.IsType<CheckResult.Deny>(result);
     }
 }

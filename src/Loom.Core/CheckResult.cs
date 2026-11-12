@@ -1,7 +1,10 @@
 namespace Loom.Core;
 
-public enum CheckResult
+public closed record CheckResult
 {
-    Deny,
-    Permit,
+    public sealed record Permit : CheckResult;
+
+    public sealed record Deny : CheckResult;
+
+    public sealed record Caveated(IReadOnlyList<string> MissingVariables) : CheckResult;
 }
