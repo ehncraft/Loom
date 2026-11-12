@@ -8,7 +8,7 @@ namespace Loom.Tests;
 public class LoomEvaluatorTests
 {
     [Fact]
-    public void Check_DirectRelationGrantsAccess_Permits()
+    public async Task Check_DirectRelationGrantsAccess_Permits()
     {
         var schema = SchemaParser.Parse(
             """
@@ -26,13 +26,13 @@ public class LoomEvaluatorTests
 
         var evaluator = new LoomEvaluator(schema, tuples);
 
-        var result = evaluator.Check(new ObjectRef("document", "1"), "edit", new SubjectRef("user", "alice"));
+        var result = await evaluator.CheckAsync(new ObjectRef("document", "1"), "edit", new SubjectRef("user", "alice"));
 
         Assert.IsType<CheckResult.Permit>(result);
     }
 
     [Fact]
-    public void Check_ComputedUsersetInheritance_EditorImpliesView()
+    public async Task Check_ComputedUsersetInheritance_EditorImpliesView()
     {
         var schema = SchemaParser.Parse(
             """
@@ -53,13 +53,13 @@ public class LoomEvaluatorTests
 
         var evaluator = new LoomEvaluator(schema, tuples);
 
-        var result = evaluator.Check(new ObjectRef("document", "1"), "view", new SubjectRef("user", "bob"));
+        var result = await evaluator.CheckAsync(new ObjectRef("document", "1"), "view", new SubjectRef("user", "bob"));
 
         Assert.IsType<CheckResult.Permit>(result);
     }
 
     [Fact]
-    public void Check_TupleToUsersetHierarchy_FolderViewerSeesDocument()
+    public async Task Check_TupleToUsersetHierarchy_FolderViewerSeesDocument()
     {
         var schema = SchemaParser.Parse(
             """
@@ -85,13 +85,13 @@ public class LoomEvaluatorTests
 
         var evaluator = new LoomEvaluator(schema, tuples);
 
-        var result = evaluator.Check(new ObjectRef("document", "1"), "view", new SubjectRef("user", "carol"));
+        var result = await evaluator.CheckAsync(new ObjectRef("document", "1"), "view", new SubjectRef("user", "carol"));
 
         Assert.IsType<CheckResult.Permit>(result);
     }
 
     [Fact]
-    public void Check_NestedUsersetViaGroupMembership_ResolvesTransitively()
+    public async Task Check_NestedUsersetViaGroupMembership_ResolvesTransitively()
     {
         var schema = SchemaParser.Parse(
             """
@@ -114,13 +114,13 @@ public class LoomEvaluatorTests
 
         var evaluator = new LoomEvaluator(schema, tuples);
 
-        var result = evaluator.Check(new ObjectRef("document", "1"), "view", new SubjectRef("user", "dave"));
+        var result = await evaluator.CheckAsync(new ObjectRef("document", "1"), "view", new SubjectRef("user", "dave"));
 
         Assert.IsType<CheckResult.Permit>(result);
     }
 
     [Fact]
-    public void Check_CyclicPermissionDefinition_DeniesInsteadOfOverflowing()
+    public async Task Check_CyclicPermissionDefinition_DeniesInsteadOfOverflowing()
     {
         var schema = SchemaParser.Parse(
             """
@@ -133,7 +133,7 @@ public class LoomEvaluatorTests
         var tuples = new InMemoryRelationTupleStore([]);
         var evaluator = new LoomEvaluator(schema, tuples);
 
-        var result = evaluator.Check(new ObjectRef("cyclic", "1"), "a", new SubjectRef("user", "anyone"));
+        var result = await evaluator.CheckAsync(new ObjectRef("cyclic", "1"), "a", new SubjectRef("user", "anyone"));
 
         Assert.IsType<CheckResult.Deny>(result);
     }

@@ -4,9 +4,9 @@ namespace Loom.Relationships;
 
 public interface IRelationTupleReader
 {
-    IEnumerable<RelationTuple> Read(ObjectRef resource, string relation);
+    Task<IReadOnlyList<RelationTuple>> ReadAsync(ObjectRef resource, string relation, CancellationToken cancellationToken);
 
-    IEnumerable<ObjectRef> ResourcesOfNamespace(string namespaceName);
+    Task<IReadOnlyList<ObjectRef>> ResourcesOfNamespaceAsync(string namespaceName, CancellationToken cancellationToken);
 
-    IEnumerable<SubjectRef> SubjectsOfNamespace(string namespaceName);
+    Task<IReadOnlyList<SubjectRef>> SubjectsOfNamespaceAsync(string namespaceName, CancellationToken cancellationToken);
 }

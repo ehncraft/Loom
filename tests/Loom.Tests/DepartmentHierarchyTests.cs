@@ -42,55 +42,55 @@ public class DepartmentHierarchyTests
     }
 
     [Fact]
-    public void ApproveRequests_DepartmentLead_Permits()
+    public async Task ApproveRequests_DepartmentLead_Permits()
     {
         var evaluator = CreateEvaluator();
 
-        var result = evaluator.Check(
+        var result = await evaluator.CheckAsync(
             new ObjectRef("department", "finance"), "approve_requests", new SubjectRef("membership", "carol"));
 
         Assert.IsType<CheckResult.Permit>(result);
     }
 
     [Fact]
-    public void ApproveRequests_DepartmentStaffWithoutLead_Denies()
+    public async Task ApproveRequests_DepartmentStaffWithoutLead_Denies()
     {
         var evaluator = CreateEvaluator();
 
-        var result = evaluator.Check(
+        var result = await evaluator.CheckAsync(
             new ObjectRef("department", "finance"), "approve_requests", new SubjectRef("membership", "dave"));
 
         Assert.IsType<CheckResult.Deny>(result);
     }
 
     [Fact]
-    public void ApproveRequests_TenantAdmin_InheritsThroughDepartmentViaTupleToUserset()
+    public async Task ApproveRequests_TenantAdmin_InheritsThroughDepartmentViaTupleToUserset()
     {
         var evaluator = CreateEvaluator();
 
-        var result = evaluator.Check(
+        var result = await evaluator.CheckAsync(
             new ObjectRef("department", "finance"), "approve_requests", new SubjectRef("membership", "root"));
 
         Assert.IsType<CheckResult.Permit>(result);
     }
 
     [Fact]
-    public void ViewRequests_DepartmentStaff_PermitsViaUnion()
+    public async Task ViewRequests_DepartmentStaff_PermitsViaUnion()
     {
         var evaluator = CreateEvaluator();
 
-        var result = evaluator.Check(
+        var result = await evaluator.CheckAsync(
             new ObjectRef("department", "finance"), "view_requests", new SubjectRef("membership", "dave"));
 
         Assert.IsType<CheckResult.Permit>(result);
     }
 
     [Fact]
-    public void ApproveRequests_UnrelatedTenantAdmin_Denies()
+    public async Task ApproveRequests_UnrelatedTenantAdmin_Denies()
     {
         var evaluator = CreateEvaluator();
 
-        var result = evaluator.Check(
+        var result = await evaluator.CheckAsync(
             new ObjectRef("department", "finance"), "approve_requests", new SubjectRef("membership", "someone-else"));
 
         Assert.IsType<CheckResult.Deny>(result);

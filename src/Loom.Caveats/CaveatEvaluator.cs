@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace Loom.Caveats;
 
 public static class CaveatEvaluator
@@ -39,8 +41,8 @@ public static class CaveatEvaluator
 
         return comparison.Operator switch
         {
-            ComparisonOperator.Equal => Equals(left, right),
-            ComparisonOperator.NotEqual => !Equals(left, right),
+            ComparisonOperator.Equal => ValuesEqual(left, right),
+            ComparisonOperator.NotEqual => !ValuesEqual(left, right),
             ComparisonOperator.LessThan => Compare(left, right) < 0,
             ComparisonOperator.LessOrEqual => Compare(left, right) <= 0,
             ComparisonOperator.GreaterThan => Compare(left, right) > 0,
@@ -51,6 +53,12 @@ public static class CaveatEvaluator
 
     private static int Compare(object? left, object? right)
     {
+        if (IsNumeric(left) && IsNumeric(right))
+        {
+            return Convert.ToDouble(left, CultureInfo.InvariantCulture)
+                .CompareTo(Convert.ToDouble(right, CultureInfo.InvariantCulture));
+        }
+
         if (left is IComparable comparable)
         {
             return comparable.CompareTo(right);
@@ -71,7 +79,7 @@ public static class CaveatEvaluator
 
         foreach (var candidate in enumerable)
         {
-            if (Equals(candidate, item))
+            if (ValuesEqual(candidate, item))
             {
                 return true;
             }
@@ -79,4 +87,24 @@ public static class CaveatEvaluator
 
         return false;
     }
+
+    /// <summary>
+    /// Boxed numeric values of different runtime types (e.g. <c>int</c> literal from a caveat
+    /// body vs. <c>long</c> deserialized from a SQL-stored JSON context) aren't
+    /// <see cref="object.Equals(object?, object?)"/>-equal even when numerically equal -- compare
+    /// as <c>double</c> when both sides are numeric, falling back to normal equality otherwise.
+    /// </summary>
+    private static bool ValuesEqual(object? left, object? right)
+    {
+        if (IsNumeric(left) && IsNumeric(right))
+        {
+            return Convert.ToDouble(left, CultureInfo.InvariantCulture)
+                .Equals(Convert.ToDouble(right, CultureInfo.InvariantCulture));
+        }
+
+        return Equals(left, right);
+    }
+
+    private static bool IsNumeric(object? value) =>
+        value is sbyte or byte or short or ushort or int or uint or long or ulong or float or double or decimal;
 }

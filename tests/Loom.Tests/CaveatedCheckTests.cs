@@ -26,7 +26,7 @@ public class CaveatedCheckTests
         """);
 
     [Fact]
-    public void Check_CaveatedTupleWithoutRuntimeContext_ReturnsCaveated()
+    public async Task Check_CaveatedTupleWithoutRuntimeContext_ReturnsCaveated()
     {
         var tuple = new RelationTuple(
             new ObjectRef("document", "1"),
@@ -40,14 +40,14 @@ public class CaveatedCheckTests
 
         var evaluator = new LoomEvaluator(ViewerSchema, new InMemoryRelationTupleStore([tuple]), MatchRegionCaveat);
 
-        var result = evaluator.Check(new ObjectRef("document", "1"), "view", new SubjectRef("user", "alice"));
+        var result = await evaluator.CheckAsync(new ObjectRef("document", "1"), "view", new SubjectRef("user", "alice"));
 
         var caveated = Assert.IsType<CheckResult.Caveated>(result);
         Assert.Equal(["observed_region"], caveated.MissingVariables);
     }
 
     [Fact]
-    public void Check_CaveatedTupleWithMatchingRuntimeContext_Permits()
+    public async Task Check_CaveatedTupleWithMatchingRuntimeContext_Permits()
     {
         var tuple = new RelationTuple(
             new ObjectRef("document", "1"),
@@ -62,13 +62,13 @@ public class CaveatedCheckTests
         var evaluator = new LoomEvaluator(ViewerSchema, new InMemoryRelationTupleStore([tuple]), MatchRegionCaveat);
 
         var context = new Dictionary<string, object?>(StringComparer.Ordinal) { ["observed_region"] = "eu-west-1" };
-        var result = evaluator.Check(new ObjectRef("document", "1"), "view", new SubjectRef("user", "alice"), context);
+        var result = await evaluator.CheckAsync(new ObjectRef("document", "1"), "view", new SubjectRef("user", "alice"), context);
 
         Assert.IsType<CheckResult.Permit>(result);
     }
 
     [Fact]
-    public void Check_CaveatedTupleWithNonMatchingRuntimeContext_Denies()
+    public async Task Check_CaveatedTupleWithNonMatchingRuntimeContext_Denies()
     {
         var tuple = new RelationTuple(
             new ObjectRef("document", "1"),
@@ -83,13 +83,13 @@ public class CaveatedCheckTests
         var evaluator = new LoomEvaluator(ViewerSchema, new InMemoryRelationTupleStore([tuple]), MatchRegionCaveat);
 
         var context = new Dictionary<string, object?>(StringComparer.Ordinal) { ["observed_region"] = "ap-south-1" };
-        var result = evaluator.Check(new ObjectRef("document", "1"), "view", new SubjectRef("user", "alice"), context);
+        var result = await evaluator.CheckAsync(new ObjectRef("document", "1"), "view", new SubjectRef("user", "alice"), context);
 
         Assert.IsType<CheckResult.Deny>(result);
     }
 
     [Fact]
-    public void Check_UnconditionalGrantAlongsideCaveatedTuple_StillPermits()
+    public async Task Check_UnconditionalGrantAlongsideCaveatedTuple_StillPermits()
     {
         var caveatedTuple = new RelationTuple(
             new ObjectRef("document", "1"),
@@ -111,13 +111,13 @@ public class CaveatedCheckTests
             new InMemoryRelationTupleStore([caveatedTuple, unconditionalTuple]),
             MatchRegionCaveat);
 
-        var result = evaluator.Check(new ObjectRef("document", "1"), "view", new SubjectRef("user", "alice"));
+        var result = await evaluator.CheckAsync(new ObjectRef("document", "1"), "view", new SubjectRef("user", "alice"));
 
         Assert.IsType<CheckResult.Permit>(result);
     }
 
     [Fact]
-    public void Check_ExclusionWithCaveatedExcludedBranch_ReturnsCaveated()
+    public async Task Check_ExclusionWithCaveatedExcludedBranch_ReturnsCaveated()
     {
         var schema = SchemaParser.Parse(
             """
@@ -147,7 +147,7 @@ public class CaveatedCheckTests
             new InMemoryRelationTupleStore([ownerTuple, blockedTuple]),
             MatchRegionCaveat);
 
-        var result = evaluator.Check(new ObjectRef("document", "1"), "edit", new SubjectRef("user", "alice"));
+        var result = await evaluator.CheckAsync(new ObjectRef("document", "1"), "edit", new SubjectRef("user", "alice"));
 
         var caveated = Assert.IsType<CheckResult.Caveated>(result);
         Assert.Equal(["observed_region"], caveated.MissingVariables);

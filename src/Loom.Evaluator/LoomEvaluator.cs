@@ -16,44 +16,73 @@ public sealed class LoomEvaluator(
     private readonly IReadOnlyDictionary<string, CaveatDefinition> _caveats =
         caveats ?? new Dictionary<string, CaveatDefinition>(StringComparer.Ordinal);
 
-    public CheckResult Check(
+    public Task<CheckResult> CheckAsync(
         ObjectRef resource,
         string permissionOrRelation,
         SubjectRef subject,
-        IReadOnlyDictionary<string, object?>? context = null)
+        IReadOnlyDictionary<string, object?>? context = null,
+        CancellationToken cancellationToken = default)
     {
         var inProgress = new HashSet<(string Namespace, string Id, string Member)>();
-        return CheckMember(resource, permissionOrRelation, subject, context ?? EmptyContext, inProgress);
+        return CheckMemberAsync(resource, permissionOrRelation, subject, context ?? EmptyContext, inProgress, cancellationToken);
     }
 
-    public ExpandNode Expand(ObjectRef resource, string permissionOrRelation)
+    public Task<ExpandNode> ExpandAsync(
+        ObjectRef resource,
+        string permissionOrRelation,
+        CancellationToken cancellationToken = default)
     {
         var inProgress = new HashSet<(string Namespace, string Id, string Member)>();
-        return ExpandMember(resource, permissionOrRelation, inProgress);
+        return ExpandMemberAsync(resource, permissionOrRelation, inProgress, cancellationToken);
     }
 
-    public IEnumerable<ObjectRef> LookupResources(
+    public async Task<IReadOnlyList<ObjectRef>> LookupResourcesAsync(
         SubjectRef subject,
         string permission,
         string resourceNamespace,
-        IReadOnlyDictionary<string, object?>? context = null) =>
-        tuples.ResourcesOfNamespace(resourceNamespace)
-            .Where(resource => Check(resource, permission, subject, context) is CheckResult.Permit);
+        IReadOnlyDictionary<string, object?>? context = null,
+        CancellationToken cancellationToken = default)
+    {
+        var candidates = await tuples.ResourcesOfNamespaceAsync(resourceNamespace, cancellationToken);
+        var results = new List<ObjectRef>();
+        foreach (var resource in candidates)
+        {
+            if (await CheckAsync(resource, permission, subject, context, cancellationToken) is CheckResult.Permit)
+            {
+                results.Add(resource);
+            }
+        }
 
-    public IEnumerable<SubjectRef> LookupSubjects(
+        return results;
+    }
+
+    public async Task<IReadOnlyList<SubjectRef>> LookupSubjectsAsync(
         ObjectRef resource,
         string permission,
         string subjectNamespace,
-        IReadOnlyDictionary<string, object?>? context = null) =>
-        tuples.SubjectsOfNamespace(subjectNamespace)
-            .Where(subject => Check(resource, permission, subject, context) is CheckResult.Permit);
+        IReadOnlyDictionary<string, object?>? context = null,
+        CancellationToken cancellationToken = default)
+    {
+        var candidates = await tuples.SubjectsOfNamespaceAsync(subjectNamespace, cancellationToken);
+        var results = new List<SubjectRef>();
+        foreach (var subject in candidates)
+        {
+            if (await CheckAsync(resource, permission, subject, context, cancellationToken) is CheckResult.Permit)
+            {
+                results.Add(subject);
+            }
+        }
 
-    private CheckResult CheckMember(
+        return results;
+    }
+
+    private async Task<CheckResult> CheckMemberAsync(
         ObjectRef resource,
         string member,
         SubjectRef subject,
         IReadOnlyDictionary<string, object?> context,
-        HashSet<(string Namespace, string Id, string Member)> inProgress)
+        HashSet<(string Namespace, string Id, string Member)> inProgress,
+        CancellationToken cancellationToken)
     {
         var key = (resource.Namespace, resource.Id, member);
         if (!inProgress.Add(key))
@@ -70,12 +99,12 @@ public sealed class LoomEvaluator(
 
             if (type.Permissions.TryGetValue(member, out var permission))
             {
-                return EvaluateExpr(permission.Expression, resource, subject, context, inProgress);
+                return await EvaluateExprAsync(permission.Expression, resource, subject, context, inProgress, cancellationToken);
             }
 
             if (type.Relations.TryGetValue(member, out _))
             {
-                return CheckRelationTuples(resource, member, subject, context, inProgress);
+                return await CheckRelationTuplesAsync(resource, member, subject, context, inProgress, cancellationToken);
             }
 
             return new CheckResult.Deny();
@@ -86,16 +115,17 @@ public sealed class LoomEvaluator(
         }
     }
 
-    private CheckResult CheckRelationTuples(
+    private async Task<CheckResult> CheckRelationTuplesAsync(
         ObjectRef resource,
         string relation,
         SubjectRef subject,
         IReadOnlyDictionary<string, object?> context,
-        HashSet<(string Namespace, string Id, string Member)> inProgress)
+        HashSet<(string Namespace, string Id, string Member)> inProgress,
+        CancellationToken cancellationToken)
     {
         HashSet<string>? missing = null;
 
-        foreach (var tuple in tuples.Read(resource, relation))
+        foreach (var tuple in await tuples.ReadAsync(resource, relation, cancellationToken))
         {
             CheckResult outcome;
             if (tuple.Subject.Relation is null)
@@ -109,7 +139,8 @@ public sealed class LoomEvaluator(
             }
             else
             {
-                var nested = CheckMember(tuple.Subject.AsObjectRef(), tuple.Subject.Relation, subject, context, inProgress);
+                var nested = await CheckMemberAsync(
+                    tuple.Subject.AsObjectRef(), tuple.Subject.Relation, subject, context, inProgress, cancellationToken);
                 outcome = GateByTupleCaveat(tuple, nested, context);
             }
 
@@ -131,40 +162,42 @@ public sealed class LoomEvaluator(
         return missing is { Count: > 0 } ? new CheckResult.Caveated([.. missing]) : new CheckResult.Deny();
     }
 
-    private CheckResult EvaluateExpr(
+    private async Task<CheckResult> EvaluateExprAsync(
         PermissionExpr expr,
         ObjectRef resource,
         SubjectRef subject,
         IReadOnlyDictionary<string, object?> context,
-        HashSet<(string Namespace, string Id, string Member)> inProgress) => expr switch
+        HashSet<(string Namespace, string Id, string Member)> inProgress,
+        CancellationToken cancellationToken) => expr switch
         {
-            PermissionExpr.Leaf leaf => CheckMember(resource, leaf.Name, subject, context, inProgress),
-            PermissionExpr.Arrow arrow => EvaluateArrow(arrow, resource, subject, context, inProgress),
+            PermissionExpr.Leaf leaf => await CheckMemberAsync(resource, leaf.Name, subject, context, inProgress, cancellationToken),
+            PermissionExpr.Arrow arrow => await EvaluateArrowAsync(arrow, resource, subject, context, inProgress, cancellationToken),
             PermissionExpr.Union union => Or(
-                EvaluateExpr(union.Left, resource, subject, context, inProgress),
-                EvaluateExpr(union.Right, resource, subject, context, inProgress)),
+                await EvaluateExprAsync(union.Left, resource, subject, context, inProgress, cancellationToken),
+                await EvaluateExprAsync(union.Right, resource, subject, context, inProgress, cancellationToken)),
             PermissionExpr.Intersection intersection => And(
-                EvaluateExpr(intersection.Left, resource, subject, context, inProgress),
-                EvaluateExpr(intersection.Right, resource, subject, context, inProgress)),
+                await EvaluateExprAsync(intersection.Left, resource, subject, context, inProgress, cancellationToken),
+                await EvaluateExprAsync(intersection.Right, resource, subject, context, inProgress, cancellationToken)),
             PermissionExpr.Exclusion exclusion => Exclude(
-                EvaluateExpr(exclusion.Left, resource, subject, context, inProgress),
-                EvaluateExpr(exclusion.Right, resource, subject, context, inProgress)),
+                await EvaluateExprAsync(exclusion.Left, resource, subject, context, inProgress, cancellationToken),
+                await EvaluateExprAsync(exclusion.Right, resource, subject, context, inProgress, cancellationToken)),
             _ => new CheckResult.Deny(),
         };
 
-    private CheckResult EvaluateArrow(
+    private async Task<CheckResult> EvaluateArrowAsync(
         PermissionExpr.Arrow arrow,
         ObjectRef resource,
         SubjectRef subject,
         IReadOnlyDictionary<string, object?> context,
-        HashSet<(string Namespace, string Id, string Member)> inProgress)
+        HashSet<(string Namespace, string Id, string Member)> inProgress,
+        CancellationToken cancellationToken)
     {
         HashSet<string>? missing = null;
 
-        foreach (var tuple in tuples.Read(resource, arrow.RelationName))
+        foreach (var tuple in await tuples.ReadAsync(resource, arrow.RelationName, cancellationToken))
         {
             var parent = tuple.Subject.AsObjectRef();
-            var nested = CheckMember(parent, arrow.Target, subject, context, inProgress);
+            var nested = await CheckMemberAsync(parent, arrow.Target, subject, context, inProgress, cancellationToken);
             var outcome = GateByTupleCaveat(tuple, nested, context);
 
             if (outcome is CheckResult.Permit)
@@ -311,10 +344,11 @@ public sealed class LoomEvaluator(
         return [.. missing];
     }
 
-    private ExpandNode ExpandMember(
+    private async Task<ExpandNode> ExpandMemberAsync(
         ObjectRef resource,
         string member,
-        HashSet<(string Namespace, string Id, string Member)> inProgress)
+        HashSet<(string Namespace, string Id, string Member)> inProgress,
+        CancellationToken cancellationToken)
     {
         var key = (resource.Namespace, resource.Id, member);
         if (!inProgress.Add(key))
@@ -331,12 +365,12 @@ public sealed class LoomEvaluator(
 
             if (type.Permissions.TryGetValue(member, out var permission))
             {
-                return ExpandExpr(permission.Expression, resource, inProgress);
+                return await ExpandExprAsync(permission.Expression, resource, inProgress, cancellationToken);
             }
 
             if (type.Relations.TryGetValue(member, out _))
             {
-                return ExpandRelation(resource, member, inProgress);
+                return await ExpandRelationAsync(resource, member, inProgress, cancellationToken);
             }
 
             return new ExpandNode.Leaf([]);
@@ -347,15 +381,16 @@ public sealed class LoomEvaluator(
         }
     }
 
-    private ExpandNode ExpandRelation(
+    private async Task<ExpandNode> ExpandRelationAsync(
         ObjectRef resource,
         string relation,
-        HashSet<(string Namespace, string Id, string Member)> inProgress)
+        HashSet<(string Namespace, string Id, string Member)> inProgress,
+        CancellationToken cancellationToken)
     {
         var direct = new List<SubjectRef>();
         var nested = new List<ExpandNode>();
 
-        foreach (var tuple in tuples.Read(resource, relation))
+        foreach (var tuple in await tuples.ReadAsync(resource, relation, cancellationToken))
         {
             if (tuple.Subject.Relation is null)
             {
@@ -363,7 +398,7 @@ public sealed class LoomEvaluator(
             }
             else
             {
-                nested.Add(ExpandMember(tuple.Subject.AsObjectRef(), tuple.Subject.Relation, inProgress));
+                nested.Add(await ExpandMemberAsync(tuple.Subject.AsObjectRef(), tuple.Subject.Relation, inProgress, cancellationToken));
             }
         }
 
@@ -376,36 +411,38 @@ public sealed class LoomEvaluator(
         return new ExpandNode.Union(children);
     }
 
-    private ExpandNode ExpandExpr(
+    private async Task<ExpandNode> ExpandExprAsync(
         PermissionExpr expr,
         ObjectRef resource,
-        HashSet<(string Namespace, string Id, string Member)> inProgress) => expr switch
+        HashSet<(string Namespace, string Id, string Member)> inProgress,
+        CancellationToken cancellationToken) => expr switch
         {
-            PermissionExpr.Leaf leaf => ExpandMember(resource, leaf.Name, inProgress),
-            PermissionExpr.Arrow arrow => ExpandArrow(arrow, resource, inProgress),
+            PermissionExpr.Leaf leaf => await ExpandMemberAsync(resource, leaf.Name, inProgress, cancellationToken),
+            PermissionExpr.Arrow arrow => await ExpandArrowAsync(arrow, resource, inProgress, cancellationToken),
             PermissionExpr.Union union => new ExpandNode.Union([
-                ExpandExpr(union.Left, resource, inProgress),
-            ExpandExpr(union.Right, resource, inProgress),
+                await ExpandExprAsync(union.Left, resource, inProgress, cancellationToken),
+            await ExpandExprAsync(union.Right, resource, inProgress, cancellationToken),
         ]),
             PermissionExpr.Intersection intersection => new ExpandNode.Intersection([
-                ExpandExpr(intersection.Left, resource, inProgress),
-            ExpandExpr(intersection.Right, resource, inProgress),
+                await ExpandExprAsync(intersection.Left, resource, inProgress, cancellationToken),
+            await ExpandExprAsync(intersection.Right, resource, inProgress, cancellationToken),
         ]),
             PermissionExpr.Exclusion exclusion => new ExpandNode.Exclusion(
-                ExpandExpr(exclusion.Left, resource, inProgress),
-                ExpandExpr(exclusion.Right, resource, inProgress)),
+                await ExpandExprAsync(exclusion.Left, resource, inProgress, cancellationToken),
+                await ExpandExprAsync(exclusion.Right, resource, inProgress, cancellationToken)),
             _ => new ExpandNode.Leaf([]),
         };
 
-    private ExpandNode.Union ExpandArrow(
+    private async Task<ExpandNode.Union> ExpandArrowAsync(
         PermissionExpr.Arrow arrow,
         ObjectRef resource,
-        HashSet<(string Namespace, string Id, string Member)> inProgress)
+        HashSet<(string Namespace, string Id, string Member)> inProgress,
+        CancellationToken cancellationToken)
     {
         List<ExpandNode> children = [];
-        foreach (var tuple in tuples.Read(resource, arrow.RelationName))
+        foreach (var tuple in await tuples.ReadAsync(resource, arrow.RelationName, cancellationToken))
         {
-            children.Add(ExpandMember(tuple.Subject.AsObjectRef(), arrow.Target, inProgress));
+            children.Add(await ExpandMemberAsync(tuple.Subject.AsObjectRef(), arrow.Target, inProgress, cancellationToken));
         }
 
         return new ExpandNode.Union(children);

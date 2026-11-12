@@ -8,7 +8,7 @@ namespace Loom.Tests;
 public class ExpandTests
 {
     [Fact]
-    public void Expand_UnionPermission_ReturnsBothBranches()
+    public async Task Expand_UnionPermission_ReturnsBothBranches()
     {
         var schema = SchemaParser.Parse(
             """
@@ -28,7 +28,7 @@ public class ExpandTests
 
         var evaluator = new LoomEvaluator(schema, tuples);
 
-        var tree = evaluator.Expand(new ObjectRef("document", "1"), "edit");
+        var tree = await evaluator.ExpandAsync(new ObjectRef("document", "1"), "edit");
 
         var union = Assert.IsType<ExpandNode.Union>(tree);
         Assert.Equal(2, union.Children.Count);
@@ -41,7 +41,7 @@ public class ExpandTests
     }
 
     [Fact]
-    public void Expand_NestedUserset_IncludesGroupSubtree()
+    public async Task Expand_NestedUserset_IncludesGroupSubtree()
     {
         var schema = SchemaParser.Parse(
             """
@@ -64,7 +64,7 @@ public class ExpandTests
 
         var evaluator = new LoomEvaluator(schema, tuples);
 
-        var tree = evaluator.Expand(new ObjectRef("document", "1"), "view");
+        var tree = await evaluator.ExpandAsync(new ObjectRef("document", "1"), "view");
 
         var union = Assert.IsType<ExpandNode.Union>(tree);
         var groupLeaf = Assert.IsType<ExpandNode.Leaf>(union.Children[1]);

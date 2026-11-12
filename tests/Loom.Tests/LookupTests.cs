@@ -32,21 +32,21 @@ public class LookupTests
     }
 
     [Fact]
-    public void LookupResources_ReturnsOnlyResourcesSubjectCanAccess()
+    public async Task LookupResources_ReturnsOnlyResourcesSubjectCanAccess()
     {
         var evaluator = CreateEvaluator(out var alice, out _);
 
-        var resources = evaluator.LookupResources(alice, "view", "document").OrderBy(r => r.Id);
+        var resources = (await evaluator.LookupResourcesAsync(alice, "view", "document")).OrderBy(r => r.Id);
 
         Assert.Equal([new ObjectRef("document", "1"), new ObjectRef("document", "3")], resources);
     }
 
     [Fact]
-    public void LookupSubjects_ReturnsOnlySubjectsWithAccess()
+    public async Task LookupSubjects_ReturnsOnlySubjectsWithAccess()
     {
         var evaluator = CreateEvaluator(out var alice, out _);
 
-        var subjects = evaluator.LookupSubjects(new ObjectRef("document", "1"), "view", "user");
+        var subjects = await evaluator.LookupSubjectsAsync(new ObjectRef("document", "1"), "view", "user");
 
         Assert.Equal([alice], subjects);
     }

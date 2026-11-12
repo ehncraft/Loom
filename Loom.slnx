@@ -4,6 +4,7 @@
     <Project Path="src/Loom.Schema/Loom.Schema.csproj" />
     <Project Path="src/Loom.Relationships/Loom.Relationships.csproj" />
     <Project Path="src/Loom.Caveats/Loom.Caveats.csproj" />
+    <Project Path="src/Loom.Spool/Loom.Spool.csproj" />
     <Project Path="src/Loom.Evaluator/Loom.Evaluator.csproj" />
   </Folder>
   <Folder Name="/tests/">

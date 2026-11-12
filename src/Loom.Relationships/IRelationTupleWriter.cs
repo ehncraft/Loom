@@ -4,7 +4,7 @@ namespace Loom.Relationships;
 
 public interface IRelationTupleWriter
 {
-    void Write(RelationTuple tuple);
+    Task WriteAsync(RelationTuple tuple, CancellationToken cancellationToken);
 
-    void Delete(RelationTuple tuple);
+    Task DeleteAsync(RelationTuple tuple, CancellationToken cancellationToken);
 }

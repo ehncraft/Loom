@@ -6,29 +6,29 @@ namespace Loom.Tests;
 public class RelationTupleStoreTests
 {
     [Fact]
-    public void Write_ThenRead_ReturnsTuple()
+    public async Task Write_ThenRead_ReturnsTuple()
     {
         var store = new InMemoryRelationTupleStore();
         var tuple = new RelationTuple(new ObjectRef("document", "1"), "owner", new SubjectRef("user", "alice"));
 
-        store.Write(tuple);
+        await store.WriteAsync(tuple, CancellationToken.None);
 
-        Assert.Equal([tuple], store.Read(new ObjectRef("document", "1"), "owner"));
+        Assert.Equal([tuple], await store.ReadAsync(new ObjectRef("document", "1"), "owner", CancellationToken.None));
     }
 
     [Fact]
-    public void Delete_RemovesTuple()
+    public async Task Delete_RemovesTuple()
     {
         var tuple = new RelationTuple(new ObjectRef("document", "1"), "owner", new SubjectRef("user", "alice"));
         var store = new InMemoryRelationTupleStore([tuple]);
 
-        store.Delete(tuple);
+        await store.DeleteAsync(tuple, CancellationToken.None);
 
-        Assert.Empty(store.Read(new ObjectRef("document", "1"), "owner"));
+        Assert.Empty(await store.ReadAsync(new ObjectRef("document", "1"), "owner", CancellationToken.None));
     }
 
     [Fact]
-    public void ResourcesOfNamespace_ReturnsDistinctResources()
+    public async Task ResourcesOfNamespace_ReturnsDistinctResources()
     {
         var store = new InMemoryRelationTupleStore([
             new RelationTuple(new ObjectRef("document", "1"), "owner", new SubjectRef("user", "alice")),
@@ -36,7 +36,7 @@ public class RelationTupleStoreTests
             new RelationTuple(new ObjectRef("document", "2"), "owner", new SubjectRef("user", "alice")),
         ]);
 
-        var resources = store.ResourcesOfNamespace("document");
+        var resources = await store.ResourcesOfNamespaceAsync("document", CancellationToken.None);
 
         Assert.Equal(
             [new ObjectRef("document", "1"), new ObjectRef("document", "2")],
@@ -44,14 +44,14 @@ public class RelationTupleStoreTests
     }
 
     [Fact]
-    public void SubjectsOfNamespace_ExcludesUsersetReferences()
+    public async Task SubjectsOfNamespace_ExcludesUsersetReferences()
     {
         var store = new InMemoryRelationTupleStore([
             new RelationTuple(new ObjectRef("document", "1"), "viewer", new SubjectRef("user", "alice")),
             new RelationTuple(new ObjectRef("document", "1"), "viewer", new SubjectRef("group", "eng", "member")),
         ]);
 
-        var subjects = store.SubjectsOfNamespace("user");
+        var subjects = await store.SubjectsOfNamespaceAsync("user", CancellationToken.None);
 
         Assert.Equal([new SubjectRef("user", "alice")], subjects);
     }
