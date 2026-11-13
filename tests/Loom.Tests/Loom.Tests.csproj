@@ -13,6 +13,7 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.10" />
   </ItemGroup>
 
   <ItemGroup>
@@ -28,6 +29,7 @@
     <ProjectReference Include="..\..\src\Loom.Evaluator\Loom.Evaluator.csproj" />
     <ProjectReference Include="..\..\src\Loom.AspNetCore\Loom.AspNetCore.csproj" />
     <ProjectReference Include="..\..\src\Loom.Testing\Loom.Testing.csproj" />
+    <ProjectReference Include="..\..\src\Loom.AuthZen\Loom.AuthZen.csproj" />
   </ItemGroup>
 
   <ItemGroup>

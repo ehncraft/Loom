@@ -8,6 +8,7 @@
     <Project Path="src/Loom.Evaluator/Loom.Evaluator.csproj" />
     <Project Path="src/Loom.AspNetCore/Loom.AspNetCore.csproj" />
     <Project Path="src/Loom.Testing/Loom.Testing.csproj" />
+    <Project Path="src/Loom.AuthZen/Loom.AuthZen.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Loom.Tests/Loom.Tests.csproj" />

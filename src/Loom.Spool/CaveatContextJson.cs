@@ -1,5 +1,7 @@
 using System.Text.Json;
 
+using Loom.Core;
+
 namespace Loom.Spool;
 
 internal static class CaveatContextJson
@@ -15,24 +17,12 @@ internal static class CaveatContextJson
         }
 
         using var document = JsonDocument.Parse(json);
-        var result = new Dictionary<string, object?>(StringComparer.Ordinal);
+        var elements = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
         foreach (var property in document.RootElement.EnumerateObject())
         {
-            result[property.Name] = ConvertElement(property.Value);
+            elements[property.Name] = property.Value;
         }
 
-        return result;
+        return JsonValueConverter.ToClrValues(elements);
     }
-
-    private static object? ConvertElement(JsonElement element) => element.ValueKind switch
-    {
-        JsonValueKind.String => element.GetString(),
-        JsonValueKind.Number => element.TryGetInt64(out var integer) ? (object)integer : element.GetDouble(),
-        JsonValueKind.True => true,
-        JsonValueKind.False => false,
-        JsonValueKind.Array => element.EnumerateArray().Select(ConvertElement).ToList(),
-        JsonValueKind.Object => element.EnumerateObject()
-            .ToDictionary(p => p.Name, p => ConvertElement(p.Value), StringComparer.Ordinal),
-        _ => null,
-    };
 }

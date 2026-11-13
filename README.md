@@ -12,12 +12,13 @@ subject identity you hand it.
 
 ## Status
 
-Early, in-progress. Phases 1-3 (current): a fully async `CheckAsync`/`ExpandAsync`/
+Early, in-progress. Phases 1-4 (current): a fully async `CheckAsync`/`ExpandAsync`/
 `LookupResourcesAsync`/`LookupSubjectsAsync` evaluator over a mutable relation-tuple store, with
 Netflix-style caveats (CEL-subset conditions attached to tuples) wired in as a third
 `Caveated` outcome alongside `Permit`/`Deny`, SQL Server-backed storage for both tuples and
-schema, a per-tenant engine cache, ASP.NET Core DI/`IAuthorizationHandler` integration, and
-framework-agnostic test assertion helpers. No AuthZEN adapter yet.
+schema, a per-tenant engine cache, ASP.NET Core DI/`IAuthorizationHandler` integration,
+framework-agnostic test assertion helpers, and an AuthZEN Authorization API 1.0-compatible HTTP
+adapter. No publish CI yet (nothing's been published to nuget.org).
 
 All store and evaluator APIs are async (`Task`-returning, `CancellationToken`-accepting) even
 though the in-memory implementation has no real I/O to await — `Loom.Spool`'s SQL-backed store
@@ -27,7 +28,7 @@ genuinely needs it, and a single interface shape avoids a sync/async split betwe
 
 | Package | Description |
 |---|---|
-| `Loom.Core` | Core value types: `ObjectRef`/`SubjectRef`/`RelationTuple`/`CheckResult`/`ExpandNode`, claims-to-`SubjectRef` mapping |
+| `Loom.Core` | Core value types: `ObjectRef`/`SubjectRef`/`RelationTuple`/`CheckResult`/`ExpandNode`, claims-to-`SubjectRef` mapping, JSON-to-CLR value conversion |
 | `Loom.Schema` | SpiceDB-style schema language: lexer, parser, AST (`definition`/`relation`/`permission`) |
 | `Loom.Relationships` | Mutable relation-tuple storage abstraction + in-memory implementation |
 | `Loom.Caveats` | CEL-subset expression engine for ABAC conditions attached to relation tuples |
@@ -35,6 +36,7 @@ genuinely needs it, and a single interface shape avoids a sync/async split betwe
 | `Loom.Evaluator` | `CheckAsync`, `ExpandAsync`, `LookupResourcesAsync`, `LookupSubjectsAsync`, `MultiTenantLoomEngine` |
 | `Loom.AspNetCore` | `services.AddLoom(...)` DI registration + `LoomAuthorizationHandler` (native `IAuthorizationHandler`) |
 | `Loom.Testing` | `ShouldPermitAsync`/`ShouldDenyAsync`/`ShouldRequireCaveatContextAsync` assertion helpers |
+| `Loom.AuthZen` | AuthZEN Authorization API 1.0-compatible `/access/v1/evaluation`(s) endpoints + health check |
 
 `LookupResourcesAsync`/`LookupSubjectsAsync` are brute-force today (scan every resource/subject
 of the target namespace and `CheckAsync` each) — correct, not yet optimized; a reverse-index-based
@@ -54,7 +56,19 @@ resource kind as a whole," the closest Zanzibar equivalent to Cedar's type-only
 `resource is SomeKind` policies (Zanzibar always checks a specific object id; there's no native
 type-level-only check).
 
-Planned: `Loom.AuthZen` adapter, publish CI.
+`Loom.AuthZen` maps AuthZEN's three-field `subject`/`resource`/`action` (plus an optional
+free-form `context`) onto `CheckAsync`, mirroring Aegis.AuthZen's wire shape closely: wire
+`context`/`properties` values are `JsonElement` (not deserialized straight into
+`Dictionary<string, object?>`, which System.Text.Json would fill with boxed `JsonElement`s
+rather than plain CLR values — a real bug caught by the test suite, see `JsonValueConverter`)
+and explicitly converted via `Loom.Core`'s `JsonValueConverter` before evaluation. Both the
+single (`/access/v1/evaluation`) and batch (`/access/v1/evaluations`, with
+`execute_all`/`deny_on_first_deny`/`permit_on_first_permit` semantics) endpoints are mapped,
+matching the full `Aegis.AuthZen` surface. A three-valued `Caveated` result maps to AuthZEN's
+boolean `decision: false` plus a `missing_context` array in the response's free-form `context`
+slot, since AuthZEN itself has no native three-valued concept.
+
+Planned: publish CI (release-please + NuGet OIDC Trusted Publishing).
 
 ## Schema example
 
