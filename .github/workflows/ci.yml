@@ -36,4 +36,4 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v7
-      - uses: zizmorcore/zizmor-action@v1
+      - uses: zizmorcore/zizmor-action@v0.8.1
