@@ -2,6 +2,10 @@ name: Release
 
 on:
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to (re)publish, e.g. v2026.11.13. Leave empty to cut a new CalVer release."
+        required: false
 
 permissions:
   contents: write
@@ -18,7 +22,7 @@ jobs:
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
-          ref: main
+          ref: ${{ inputs.tag || 'main' }}
 
       - uses: actions/setup-dotnet@v6
         with:
@@ -31,6 +35,7 @@ jobs:
 
       - name: Bump version (CalVer)
         id: bump
+        if: ${{ inputs.tag == '' }}
         run: |
           BEFORE=$(grep -oP '(?<=<Version>)[^<]+' Directory.Build.props | head -1)
           PREVIOUS_TAG=$(git tag -l "v*" --sort=-creatordate | head -1)
@@ -48,6 +53,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Push version commit and tag
+        if: ${{ inputs.tag == '' }}
         run: |
           for attempt in 1 2 3 4 5; do
             git pull --rebase origin main
@@ -55,6 +61,16 @@ jobs:
             echo "Push attempt $attempt rejected (concurrent release race); retrying in ${attempt}s..."
             sleep "$attempt"
           done
+
+      - name: Resolve version
+        id: version
+        run: |
+          VERSION="${{ steps.bump.outputs.version }}"
+          [[ -z "$VERSION" ]] && VERSION="${TAG_INPUT#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "previous_tag=${{ steps.bump.outputs.previous_tag }}" >> "$GITHUB_OUTPUT"
+        env:
+          TAG_INPUT: ${{ inputs.tag }}
 
       - run: dotnet restore
       - run: dotnet build --no-restore -c Release
@@ -84,14 +100,20 @@ jobs:
         env:
           NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
 
-      - name: Create GitHub release
+      - name: Create or update GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          NOTES_START_FLAG=()
-          [[ -n "${{ steps.bump.outputs.previous_tag }}" ]] && NOTES_START_FLAG=(--notes-start-tag "${{ steps.bump.outputs.previous_tag }}")
-          gh release create "v${{ steps.bump.outputs.version }}" \
-            --title "Loom v${{ steps.bump.outputs.version }}" \
-            --generate-notes \
-            "${NOTES_START_FLAG[@]}" \
-            ./nupkgs/*.nupkg
+          TAG="v${{ steps.version.outputs.version }}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" ./nupkgs/*.nupkg --clobber
+          else
+            NOTES_START_FLAG=()
+            [[ -n "${{ steps.version.outputs.previous_tag }}" ]] && \
+              NOTES_START_FLAG=(--notes-start-tag "${{ steps.version.outputs.previous_tag }}")
+            gh release create "$TAG" \
+              --title "Loom $TAG" \
+              --generate-notes \
+              "${NOTES_START_FLAG[@]}" \
+              ./nupkgs/*.nupkg
+          fi
