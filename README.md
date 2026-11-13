@@ -68,7 +68,18 @@ matching the full `Aegis.AuthZen` surface. A three-valued `Caveated` result maps
 boolean `decision: false` plus a `missing_context` array in the response's free-form `context`
 slot, since AuthZEN itself has no native three-valued concept.
 
-Planned: publish CI (release-please + NuGet OIDC Trusted Publishing).
+## Release process
+
+Manual (`workflow_dispatch` on `.github/workflows/release.yml`), CalVer-versioned
+(`scripts/next-calver.sh`, `YYYY.M.D` with a `.N` suffix for a same-day second release) — a
+single shared `<Version>` in `Directory.Build.props` across every `Loom.*` package, bumped,
+committed, and tagged directly by the workflow itself (no release-please/Conventional-Commits
+version-bump automation; this is a small early-stage library, that layer of process was
+overkill for it). Publishes to nuget.org via NuGet Trusted Publishing (OIDC, no stored API key)
+and attaches the packed `.nupkg`s to an auto-generated GitHub release.
+
+CI (`.github/workflows/ci.yml`) also runs [zizmor](https://docs.zizmor.sh) against the
+workflow files themselves on every push/PR — a GitHub Actions security linter.
 
 ## Schema example
 

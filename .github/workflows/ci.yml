@@ -29,3 +29,11 @@ jobs:
           directory: ./coverage
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
+
+  zizmor:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: zizmorcore/zizmor-action@v1

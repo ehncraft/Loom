@@ -1,0 +1,97 @@
+name: Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write # required for NuGet Trusted Publishing (OIDC)
+    steps:
+      - name: Checkout with full history
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: main
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: "11.0.x"
+
+      - name: Configure git
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Bump version (CalVer)
+        id: bump
+        run: |
+          BEFORE=$(grep -oP '(?<=<Version>)[^<]+' Directory.Build.props | head -1)
+          PREVIOUS_TAG=$(git tag -l "v*" --sort=-creatordate | head -1)
+          VERSION=$(scripts/next-calver.sh "v")
+
+          sed -i.bak "s|<Version>$BEFORE</Version>|<Version>$VERSION</Version>|" Directory.Build.props
+          rm -f Directory.Build.props.bak
+          git add Directory.Build.props
+          git commit -m "chore(release): loom v$VERSION"
+          git tag "v$VERSION"
+
+          {
+            echo "version=$VERSION"
+            echo "previous_tag=$PREVIOUS_TAG"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Push version commit and tag
+        run: |
+          for attempt in 1 2 3 4 5; do
+            git pull --rebase origin main
+            git push origin main "v${{ steps.bump.outputs.version }}" && break
+            echo "Push attempt $attempt rejected (concurrent release race); retrying in ${attempt}s..."
+            sleep "$attempt"
+          done
+
+      - run: dotnet restore
+      - run: dotnet build --no-restore -c Release
+      - run: dotnet test --no-build -c Release
+
+      - name: Pack
+        run: |
+          mkdir -p nupkgs
+          dotnet pack src/Loom.Core/Loom.Core.csproj -c Release --no-build -o ./nupkgs
+          dotnet pack src/Loom.Schema/Loom.Schema.csproj -c Release --no-build -o ./nupkgs
+          dotnet pack src/Loom.Relationships/Loom.Relationships.csproj -c Release --no-build -o ./nupkgs
+          dotnet pack src/Loom.Caveats/Loom.Caveats.csproj -c Release --no-build -o ./nupkgs
+          dotnet pack src/Loom.Spool/Loom.Spool.csproj -c Release --no-build -o ./nupkgs
+          dotnet pack src/Loom.Evaluator/Loom.Evaluator.csproj -c Release --no-build -o ./nupkgs
+          dotnet pack src/Loom.AspNetCore/Loom.AspNetCore.csproj -c Release --no-build -o ./nupkgs
+          dotnet pack src/Loom.Testing/Loom.Testing.csproj -c Release --no-build -o ./nupkgs
+          dotnet pack src/Loom.AuthZen/Loom.AuthZen.csproj -c Release --no-build -o ./nupkgs
+
+      - name: NuGet login (OIDC -> temp API key)
+        uses: NuGet/login@v1
+        id: login
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
+      - name: Push to NuGet.org
+        run: dotnet nuget push "./nupkgs/*.nupkg" --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
+        env:
+          NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          NOTES_START_FLAG=()
+          [[ -n "${{ steps.bump.outputs.previous_tag }}" ]] && NOTES_START_FLAG=(--notes-start-tag "${{ steps.bump.outputs.previous_tag }}")
+          gh release create "v${{ steps.bump.outputs.version }}" \
+            --title "Loom v${{ steps.bump.outputs.version }}" \
+            --generate-notes \
+            "${NOTES_START_FLAG[@]}" \
+            ./nupkgs/*.nupkg
