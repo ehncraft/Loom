@@ -5,11 +5,6 @@ using Loom.Relationships;
 
 namespace Loom.Tests;
 
-/// <summary>
-/// Validates that a tenant's department structure is expressible as first-class schema
-/// definitions (not a flattened attribute) -- tenant -&gt; department -&gt; membership, with
-/// tuple_to_userset carrying a tenant-level admin override down into every department.
-/// </summary>
 public class DepartmentHierarchyTests
 {
     private static LoomEvaluator CreateEvaluator()

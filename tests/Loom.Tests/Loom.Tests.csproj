@@ -26,6 +26,12 @@
     <ProjectReference Include="..\..\src\Loom.Caveats\Loom.Caveats.csproj" />
     <ProjectReference Include="..\..\src\Loom.Spool\Loom.Spool.csproj" />
     <ProjectReference Include="..\..\src\Loom.Evaluator\Loom.Evaluator.csproj" />
+    <ProjectReference Include="..\..\src\Loom.AspNetCore\Loom.AspNetCore.csproj" />
+    <ProjectReference Include="..\..\src\Loom.Testing\Loom.Testing.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
 </Project>

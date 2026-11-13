@@ -15,9 +15,9 @@ subject identity you hand it.
 Early, in-progress. Phases 1-3 (current): a fully async `CheckAsync`/`ExpandAsync`/
 `LookupResourcesAsync`/`LookupSubjectsAsync` evaluator over a mutable relation-tuple store, with
 Netflix-style caveats (CEL-subset conditions attached to tuples) wired in as a third
-`Caveated` outcome alongside `Permit`/`Deny`, plus optional SQL Server-backed storage for both
-tuples and schema. No multi-tenant engine cache, no ASP.NET Core integration, no AuthZEN
-adapter yet.
+`Caveated` outcome alongside `Permit`/`Deny`, SQL Server-backed storage for both tuples and
+schema, a per-tenant engine cache, ASP.NET Core DI/`IAuthorizationHandler` integration, and
+framework-agnostic test assertion helpers. No AuthZEN adapter yet.
 
 All store and evaluator APIs are async (`Task`-returning, `CancellationToken`-accepting) even
 though the in-memory implementation has no real I/O to await — `Loom.Spool`'s SQL-backed store
@@ -27,22 +27,34 @@ genuinely needs it, and a single interface shape avoids a sync/async split betwe
 
 | Package | Description |
 |---|---|
-| `Loom.Core` | Core value types: `ObjectRef`, `SubjectRef`, `RelationTuple`, `CheckResult`, `ExpandNode` |
+| `Loom.Core` | Core value types: `ObjectRef`/`SubjectRef`/`RelationTuple`/`CheckResult`/`ExpandNode`, claims-to-`SubjectRef` mapping |
 | `Loom.Schema` | SpiceDB-style schema language: lexer, parser, AST (`definition`/`relation`/`permission`) |
 | `Loom.Relationships` | Mutable relation-tuple storage abstraction + in-memory implementation |
 | `Loom.Caveats` | CEL-subset expression engine for ABAC conditions attached to relation tuples |
 | `Loom.Spool` | SQL Server-backed relation-tuple and schema storage, configurable table/column mapping |
-| `Loom.Evaluator` | `CheckAsync`, `ExpandAsync`, `LookupResourcesAsync`, `LookupSubjectsAsync` |
+| `Loom.Evaluator` | `CheckAsync`, `ExpandAsync`, `LookupResourcesAsync`, `LookupSubjectsAsync`, `MultiTenantLoomEngine` |
+| `Loom.AspNetCore` | `services.AddLoom(...)` DI registration + `LoomAuthorizationHandler` (native `IAuthorizationHandler`) |
+| `Loom.Testing` | `ShouldPermitAsync`/`ShouldDenyAsync`/`ShouldRequireCaveatContextAsync` assertion helpers |
 
 `LookupResourcesAsync`/`LookupSubjectsAsync` are brute-force today (scan every resource/subject
 of the target namespace and `CheckAsync` each) — correct, not yet optimized; a reverse-index-based
 traversal is a later-phase concern. `ExpandAsync` is purely structural and caveat-unaware,
 matching real SpiceDB semantics (caveats only resolve at `Check` time, once runtime context is
 known). `Loom.Spool` isolates tenants structurally, one schema per tenant (e.g.
-`tenant_123.RelationTuples`), not a shared table filtered by a tenant-id column.
+`tenant_123.RelationTuples`), not a shared table filtered by a tenant-id column —
+`MultiTenantLoomEngine` mirrors that same structural isolation at the evaluator layer, one
+lazily-built `LoomEvaluator` cached per tenant until `InvalidateAsync` evicts it.
 
-Planned: `Loom.AspNetCore`, `Loom.AuthZen`, `Loom.Testing`, a multi-tenant engine cache
-(`MultiTenantLoomEngine`, mirroring Aegis's own lazy-per-tenant-engine pattern).
+`LoomAuthorizationHandler` resolves the resource to check against `AuthorizationHandlerContext`'s
+own resource object: a supplied `ObjectRef` is used directly, a `string` becomes
+`new ObjectRef(requirement.ResourceNamespace, thatString)`, and anything else (declarative
+`[Authorize(Policy = "...")]` with no instance in hand) falls back to
+`ObjectRef.KindLevel(requirement.ResourceNamespace)` — a well-known `"_"` id representing "the
+resource kind as a whole," the closest Zanzibar equivalent to Cedar's type-only
+`resource is SomeKind` policies (Zanzibar always checks a specific object id; there's no native
+type-level-only check).
+
+Planned: `Loom.AuthZen` adapter, publish CI.
 
 ## Schema example
 

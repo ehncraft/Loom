@@ -88,12 +88,6 @@ public static class CaveatEvaluator
         return false;
     }
 
-    /// <summary>
-    /// Boxed numeric values of different runtime types (e.g. <c>int</c> literal from a caveat
-    /// body vs. <c>long</c> deserialized from a SQL-stored JSON context) aren't
-    /// <see cref="object.Equals(object?, object?)"/>-equal even when numerically equal -- compare
-    /// as <c>double</c> when both sides are numeric, falling back to normal equality otherwise.
-    /// </summary>
     private static bool ValuesEqual(object? left, object? right)
     {
         if (IsNumeric(left) && IsNumeric(right))
