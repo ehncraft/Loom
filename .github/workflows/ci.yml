@@ -34,6 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      security-events: write # required to upload SARIF results to the Security tab
     steps:
       - uses: actions/checkout@v7
       - uses: zizmorcore/zizmor-action@v0.8.1
