@@ -10,7 +10,7 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <Version>0.0.0</Version>
+    <Version>2026.11.13</Version>
     <Authors>ehncraft</Authors>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/ehncraft/Loom</PackageProjectUrl>
